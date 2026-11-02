@@ -1,0 +1,482 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>A Day For Us</title>
+<style>
+  /* Layout concept: a single-screen love-note app — full-bleed dusk background with
+     floating hearts, three soft-fading states (welcome → pick → the plan timeline).
+     Two-way day: lunch at Antera first, scenic stops on the drive back; the finished
+     plan can be fired straight to Anvika from the last screen. */
+  :root{
+    --bg1:#2a1222; --bg2:#431f33; --bg3:#5a2b3c;
+    --surface:#3d1e30; --surface-2:#4a2539; --line:#6b3a50;
+    --fg:#fdeaec; --muted:#e0a9b6; --muted-2:#bd8092;
+    --rose:#ff6f8d; --rose-deep:#e04e70; --gold:#f4c96b;
+    --ok:#8fe0b0; --wa:#25d366;
+    color-scheme: dark;
+    --sans:'Nunito', ui-sans-serif, system-ui, sans-serif;
+    --serif:'Fraunces', Georgia, 'Times New Roman', serif;
+    --hand:'Caveat', 'Comic Sans MS', cursive;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:var(--sans); color:var(--fg);
+    background:
+      radial-gradient(1200px 700px at 80% -10%, var(--bg3), transparent 60%),
+      radial-gradient(900px 600px at 10% 110%, var(--bg3), transparent 55%),
+      linear-gradient(160deg, var(--bg1), var(--bg2) 60%, var(--bg1));
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{position:relative; min-height:100%; display:flex; flex-direction:column; isolation:isolate; overflow:hidden}
+
+  /* floating hearts */
+  .hearts{position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden}
+  .hearts b{position:absolute; bottom:-8%; font-size:1.2rem; color:var(--rose); opacity:0; filter:drop-shadow(0 2px 6px rgba(224,78,112,.35)); animation:rise linear infinite}
+  @keyframes rise{
+    0%{transform:translateY(0) rotate(0); opacity:0}
+    10%{opacity:.85}
+    90%{opacity:.6}
+    100%{transform:translateY(-118vh) rotate(25deg); opacity:0}
+  }
+
+  .screen{flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;
+    padding-block:48px;
+    padding-left:max(20px, env(safe-area-inset-left,0px));
+    padding-right:max(20px, env(safe-area-inset-right,0px));
+    width:100%; max-width:640px; margin-inline:auto; text-align:center;
+    animation:fade .6s ease both}
+  @keyframes fade{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+
+  .eyebrow{font-family:var(--hand); color:var(--gold); font-size:1.5rem; line-height:1; margin:0 0 .2em}
+  h1{font-family:var(--serif); font-weight:600; font-size:clamp(2.3rem,9vw,3.6rem); line-height:1.02;
+    margin:.1em 0 .35em; text-wrap:balance; letter-spacing:-.01em}
+  .lead{color:var(--muted); font-size:1.08rem; line-height:1.5; max-width:36ch; margin:0 auto 1.8em; text-wrap:balance}
+
+  .btn{font-family:var(--sans); font-weight:800; font-size:1.05rem; color:#2a1222;
+    background:linear-gradient(135deg, var(--gold), var(--rose)); border:0; border-radius:999px;
+    padding:15px 30px; cursor:pointer; box-shadow:0 10px 26px rgba(224,78,112,.4);
+    transition:transform .15s ease, box-shadow .15s ease; display:inline-flex; align-items:center; gap:.5em;
+    text-decoration:none}
+  .btn:hover{transform:translateY(-2px) scale(1.02); box-shadow:0 14px 32px rgba(224,78,112,.5)}
+  .btn:active{transform:translateY(0) scale(.99)}
+  .btn[disabled]{opacity:.45; cursor:not-allowed; box-shadow:none; filter:grayscale(.2)}
+  .btn.ghost{background:transparent; color:var(--muted); box-shadow:none; border:1px solid var(--line); font-weight:700}
+  .btn.ghost:hover{color:var(--fg); border-color:var(--rose); transform:translateY(-1px)}
+  .btn.wa{background:linear-gradient(135deg,#2bd37a,#13b893); color:#06321f}
+  .btn.wa:hover{box-shadow:0 14px 32px rgba(37,211,102,.4)}
+
+  .heart-pulse{font-size:2.4rem; animation:beat 1.4s ease-in-out infinite; display:inline-block}
+  @keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.18)}30%{transform:scale(1)}45%{transform:scale(1.12)}}
+
+  /* quiz */
+  .screen.wide{max-width:720px; justify-content:flex-start}
+  .step-head{margin-bottom:1.1em}
+  .step-head h2{font-family:var(--serif); font-weight:600; font-size:clamp(1.7rem,6vw,2.3rem); margin:.1em 0 .25em; text-wrap:balance}
+  .step-head p{color:var(--muted); margin:0; font-size:1rem; max-width:44ch; margin-inline:auto; line-height:1.45}
+
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; width:100%; margin-bottom:26px}
+  @media (max-width:460px){.grid{grid-template-columns:1fr}}
+  .card{position:relative; text-align:left; background:var(--surface); border:1.5px solid var(--line);
+    border-radius:18px; padding:16px 16px 15px; cursor:pointer; transition:border-color .18s, background .18s, transform .18s;
+    display:flex; flex-direction:column; gap:3px}
+  .card:hover{transform:translateY(-3px); border-color:var(--muted-2)}
+  .card .emo{font-size:1.7rem; line-height:1}
+  .card .nm{font-weight:800; font-size:1.0rem; margin-top:4px; line-height:1.2}
+  .card .ar{font-family:var(--hand); color:var(--gold); font-size:1.12rem; line-height:1.05}
+  .card .tag{display:inline-block; align-self:flex-start; font-size:.68rem; font-weight:800; letter-spacing:.05em;
+    text-transform:uppercase; padding:2px 8px; border-radius:999px; margin:3px 0 2px}
+  .card .tag.free{background:rgba(143,224,176,.16); color:var(--ok)}
+  .card .tag.paid{background:rgba(244,201,107,.16); color:var(--gold)}
+  .card .ds{color:var(--muted); font-size:.85rem; line-height:1.4}
+  .card .pick{position:absolute; top:12px; right:12px; width:26px; height:26px; border-radius:50%;
+    border:1.5px solid var(--line); display:grid; place-items:center; font-size:.9rem; color:transparent; transition:.18s}
+  .card[aria-pressed="true"]{border-color:var(--rose); background:var(--surface-2); box-shadow:0 0 0 1px var(--rose) inset}
+  .card[aria-pressed="true"] .pick{background:var(--rose); border-color:var(--rose); color:#2a1222; font-weight:900}
+
+  .toggle-wrap{margin:0 0 26px}
+  .toggle-wrap .lbl{font-family:var(--hand); color:var(--gold); font-size:1.3rem; display:block; margin-bottom:8px}
+  .seg{display:inline-flex; background:var(--surface); border:1.5px solid var(--line); border-radius:999px; padding:4px}
+  .seg button{font-family:var(--sans); font-weight:800; color:var(--muted); background:transparent; border:0; cursor:pointer;
+    padding:9px 22px; border-radius:999px; font-size:.95rem; transition:.18s}
+  .seg button[aria-pressed="true"]{background:linear-gradient(135deg,var(--gold),var(--rose)); color:#2a1222}
+
+  .actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center}
+  .count{font-family:var(--hand); color:var(--muted); font-size:1.25rem; width:100%; margin-bottom:6px}
+
+  /* plan */
+  .plan-head{width:100%; text-align:center; margin-bottom:8px}
+  .plan-head .eyebrow{margin-bottom:.1em}
+  .plan-head h2{font-family:var(--serif); font-weight:600; font-size:clamp(1.8rem,6vw,2.4rem); margin:.1em 0 .2em}
+  .route-chip{display:inline-flex; align-items:center; gap:.45em; flex-wrap:wrap; justify-content:center;
+    color:var(--muted); font-weight:700; font-size:.88rem; background:var(--surface); border:1px solid var(--line);
+    border-radius:999px; padding:8px 16px; margin-bottom:22px}
+  .route-chip .arw{color:var(--rose)}
+
+  .timeline{width:100%; position:relative; padding-left:34px; margin-bottom:8px}
+  .timeline::before{content:""; position:absolute; left:11px; top:6px; bottom:18px; width:2px;
+    background:linear-gradient(var(--gold),var(--rose)); border-radius:2px}
+  .tl{position:relative; margin-bottom:16px; animation:slidein .5s ease both}
+  @keyframes slidein{from{opacity:0; transform:translateX(-8px)} to{opacity:1; transform:none}}
+  .tl::before{content:""; position:absolute; left:-29px; top:4px; width:16px; height:16px; border-radius:50%;
+    background:var(--rose); border:3px solid var(--bg1); box-shadow:0 0 0 2px var(--rose)}
+  .tl.travel::before{background:var(--muted-2); box-shadow:0 0 0 2px var(--muted-2); width:12px; height:12px; left:-27px; top:6px}
+  .tl.start::before,.tl.lunch::before,.tl.end::before{background:var(--gold); box-shadow:0 0 0 2px var(--gold)}
+  .tl.lunch::before,.tl.end::before{width:20px; height:20px; left:-31px}
+  .tl .t{font-weight:800; color:var(--gold); font-size:.82rem; letter-spacing:.04em; font-variant-numeric:tabular-nums}
+  .tl .ttl{font-weight:800; font-size:1.05rem; margin:1px 0 1px; text-align:left}
+  .tl .sub{color:var(--muted); font-size:.89rem; line-height:1.45; text-align:left}
+  .tl.travel{margin-bottom:12px}
+  .tl.travel .ttl{font-weight:700; font-size:.92rem; color:var(--muted); display:flex; align-items:center; gap:.4em; flex-wrap:wrap}
+  .tl.travel .fare{color:var(--ok); font-weight:800}
+  .tl.lunch .box,.tl.end .box{background:linear-gradient(135deg, rgba(244,201,107,.14), rgba(255,111,141,.14));
+    border:1.5px solid var(--rose); border-radius:16px; padding:14px 16px; text-align:left}
+  .tl.lunch .ttl,.tl.end .ttl{font-family:var(--serif); font-size:1.22rem; color:var(--fg)}
+
+  .summary{width:100%; background:var(--surface); border:1px solid var(--line); border-radius:18px;
+    padding:18px; margin:14px 0 18px; text-align:left}
+  .summary .row{display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:5px 0; color:var(--muted); font-size:.95rem}
+  .summary .row b{color:var(--fg); font-variant-numeric:tabular-nums}
+  .summary .total{border-top:1px dashed var(--line); margin-top:8px; padding-top:12px; font-size:1.05rem}
+  .summary .total b{color:var(--gold); font-size:1.3rem}
+  .summary .tiny{color:var(--muted-2); font-size:.8rem; margin-top:8px; line-height:1.4}
+  .saved{font-family:var(--hand); color:var(--gold); font-size:1.2rem; text-align:center; margin:2px 0 18px; line-height:1.3}
+
+  /* send-to-Anvika block */
+  .send{width:100%; background:linear-gradient(135deg, rgba(37,211,102,.08), rgba(255,111,141,.08));
+    border:1.5px dashed var(--rose); border-radius:18px; padding:18px 16px; text-align:center; margin-bottom:20px}
+  .send h3{font-family:var(--serif); font-weight:600; font-size:1.2rem; margin:0 0 .2em}
+  .send p{color:var(--muted); font-size:.9rem; margin:0 0 14px; line-height:1.4}
+  .send .btns{display:flex; gap:10px; flex-wrap:wrap; justify-content:center}
+  .toast{min-height:1.2em; margin-top:10px; font-family:var(--hand); font-size:1.25rem; color:var(--ok); transition:opacity .2s}
+  .fallback{width:100%; margin-top:10px; background:var(--bg1); color:var(--fg); border:1px solid var(--line);
+    border-radius:12px; padding:10px; font-size:.82rem; font-family:ui-monospace,monospace; resize:vertical}
+
+  .love-note{font-family:var(--hand); color:var(--fg); font-size:1.5rem; line-height:1.35; text-align:center;
+    max-width:26ch; margin:6px auto 26px; text-wrap:balance}
+  .love-note span{color:var(--rose)}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important; transition:none !important}
+    .hearts{display:none}
+  }
+</style>
+
+<div class="app">
+  <div class="hearts" id="hearts" aria-hidden="true"></div>
+
+  <!-- WELCOME -->
+  <section class="screen" id="welcome">
+    <div class="heart-pulse">💞</div>
+    <p class="eyebrow">come here, you ✨</p>
+    <h1>Welcome,<br>Bangaram</h1>
+    <p class="lead">Lunch at Antera first — we'll reach by 12:30, no rushing. Then I'm stealing you for a slow, scenic drive back home. Ready?</p>
+    <button class="btn" id="startBtn">Start our day <span aria-hidden="true">→</span></button>
+  </section>
+
+  <!-- QUIZ -->
+  <section class="screen wide" id="quiz" hidden>
+    <div class="step-head">
+      <p class="eyebrow">your turn, cutie 🥰</p>
+      <h2>What should we do on the way back?</h2>
+      <p>After lunch at Antera, tap every spot that sounds fun. I'll fit the best ones into our drive home before 5 — parks, lakes, little lovers' corners. 💗</p>
+    </div>
+    <div class="grid" id="placeGrid"></div>
+
+    <div class="toggle-wrap">
+      <span class="lbl">how are we getting around?</span>
+      <div class="seg" id="modeSeg" role="group" aria-label="Travel mode">
+        <button data-mode="auto" aria-pressed="true">🛺 Auto (budget)</button>
+        <button data-mode="cab" aria-pressed="false">🚗 Cab (comfy)</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <span class="count" id="countMsg">pick at least one 💗</span>
+      <button class="btn ghost" id="backWelcome">← back</button>
+      <button class="btn" id="makeBtn" disabled>Make our plan <span aria-hidden="true">💫</span></button>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section class="screen wide" id="plan" hidden>
+    <div class="plan-head">
+      <p class="eyebrow">here's us 💕</p>
+      <h2>Our Day Together</h2>
+      <div class="route-chip">
+        <span>GRIET</span><span class="arw">→</span><span>🍽️ Antera by 12:30</span><span class="arw">→</span><span id="stopCount">stops</span><span class="arw">→</span><span>home 💞</span>
+      </div>
+    </div>
+    <div class="timeline" id="timeline"></div>
+    <p class="saved" id="savedMsg" hidden></p>
+    <div class="summary" id="summary"></div>
+
+    <div class="send">
+      <h3>💌 Send this plan to Bangaram</h3>
+      <p>Tap below — it opens WhatsApp with the whole plan written out. Just pick Bangaram and hit send. 💞</p>
+      <div class="btns">
+        <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener">📲 Send on WhatsApp</a>
+        <button class="btn ghost" id="copyBtn">💌 Copy plan</button>
+      </div>
+      <div class="toast" id="toast" aria-live="polite"></div>
+      <textarea class="fallback" id="fallback" rows="6" readonly hidden></textarea>
+    </div>
+
+    <p class="love-note">Whatever we pick, my favourite part is <span>you</span>. 💌</p>
+    <div class="actions">
+      <button class="btn ghost" id="editBtn">↩ change our picks</button>
+      <button class="btn ghost" id="restartBtn">start over 💞</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- hearts ----
+  (function(){
+    var box=document.getElementById('hearts');
+    var glyphs=['❤','💕','💗','🌸','✨','💖'];
+    for(var i=0;i<16;i++){
+      var h=document.createElement('b');
+      h.textContent=glyphs[i%glyphs.length];
+      h.style.left=(Math.random()*96+2)+'%';
+      h.style.animationDuration=(7+Math.random()*7)+'s';
+      h.style.animationDelay=(-Math.random()*12)+'s';
+      h.style.fontSize=(0.8+Math.random()*1.4)+'rem';
+      box.appendChild(h);
+    }
+  })();
+
+  // ---- data ----
+  // order: progression GRIET(low) -> Antera/Gachibowli(high). On the way back we visit high -> low.
+  // a = approx hop between Antera and the place (first return leg). g = hop between place and home (final leg).
+  // entry = total for the two of us, in rupees. All money/time are friendly approximations.
+  var PLACES=[
+    {id:'kothwalguda',order:7,emo:'🌿',nm:'Kothwalguda Eco Hill Park',ar:'near Himayat Sagar',free:false,dur:55,entry:200,
+     a:{min:18,auto:120}, g:{min:55,auto:300},
+     ds:'A 1.5-km treetop boardwalk with Himayat Sagar glittering below — made for holding hands. (₹100 each; aviary extra if we feel fancy.)'},
+    {id:'gandipet',order:6,emo:'🌅',nm:'Osman Sagar (Gandipet) lake',ar:'west, lakeside',free:true,dur:40,entry:0,
+     a:{min:22,auto:150}, g:{min:50,auto:270},
+     ds:'Free, breezy reservoir views. We just sit, watch the water, and lose all track of time.'},
+    {id:'streetfood',order:7,emo:'🥟',nm:'Street-food crawl',ar:'Gachibowli',free:true,dur:30,entry:100,
+     a:{min:8,auto:50}, g:{min:40,auto:210},
+     ds:'Pani-puri face-off. Loser buys… okay fine, I’ll buy. 😄'},
+    {id:'botanical',order:5,emo:'🪷',nm:'Botanical Garden',ar:'Kondapur',free:false,dur:40,entry:60,
+     a:{min:12,auto:70}, g:{min:35,auto:180},
+     ds:'Quiet green benches made for long, happy, pointless talks. (Tiny ₹30 entry each.)'},
+    {id:'mall',order:5,emo:'🛍️',nm:'Mall escape',ar:'Inorbit / Sarath City',free:true,dur:55,entry:0,
+     a:{min:12,auto:70}, g:{min:35,auto:180},
+     ds:'AC, arcade games, window-shopping, one shared ice cream. Free to just roam.'},
+    {id:'durgam',order:4,emo:'🌉',nm:'Durgam Cheruvu & Cable Bridge',ar:'Madhapur',free:true,dur:45,entry:0,
+     a:{min:20,auto:110}, g:{min:40,auto:210},
+     ds:'Our secret lake — the promenade is free, the cable bridge glows on the water, and you glow more.'},
+    {id:'shilparamam',order:4,emo:'🎨',nm:'Shilparamam',ar:'Madhapur',free:false,dur:50,entry:120,
+     a:{min:20,auto:110}, g:{min:40,auto:200},
+     ds:'Craft village — tiny trinkets, silly photos, rustic charm. (₹60 each.)'},
+    {id:'kbr',order:3,emo:'🌳',nm:'KBR Park walk',ar:'Jubilee Hills',free:false,dur:45,entry:40,
+     a:{min:25,auto:130}, g:{min:45,auto:230},
+     ds:'A green, shady loop. Slow steps, maybe a peacock if we’re lucky. (₹20 each.)'},
+    {id:'jvr',order:3,emo:'⛲',nm:'JVR Park (musical fountain)',ar:'Banjara Hills',free:false,dur:40,entry:40,
+     a:{min:28,auto:150}, g:{min:48,auto:250},
+     ds:'Shady lawns, a little lake, a musical fountain — cheap and stupidly romantic. (₹20 each.)'},
+    {id:'chai',order:2,emo:'☕',nm:'Chai & maska break',ar:'closer to home',free:false,dur:30,entry:60,
+     a:{min:18,auto:90}, g:{min:15,auto:60},
+     ds:'Cutting chai, buttery maska, and no rush at all — the softest way to end our day.'}
+  ];
+
+  var START=11*60+30;          // 11:30 depart GRIET
+  var GRIET_TO_ANTERA={min:40, auto:220};
+  var ANTERA_ARRIVE=START+GRIET_TO_ANTERA.min; // ~12:10, before her 12:30 limit
+  var LUNCH_MIN=60;            // lunch at Antera
+  var MID={min:15, auto:60};  // hop between consecutive return stops (clustered areas)
+  var END=17*60;              // home by ~5:00
+
+  function cab(a){return Math.round(a*1.5);}
+  function fare(obj,mode){return mode==='cab'?cab(obj.auto):obj.auto;}
+
+  var selected=[]; // ids in tap order
+  var mode='auto';
+  var shareText='';
+
+  // ---- helpers ----
+  function fmt(m){
+    m=Math.round(m);
+    var h=Math.floor(m/60), mm=m%60;
+    var ap=h>=12?'PM':'AM'; var h12=h%12; if(h12===0)h12=12;
+    return h12+':'+(mm<10?'0':'')+mm+' '+ap;
+  }
+  function show(id){
+    ['welcome','quiz','plan'].forEach(function(s){ document.getElementById(s).hidden=(s!==id); });
+    window.scrollTo(0,0);
+  }
+  function el(tag,cls){var e=document.createElement(tag); if(cls)e.className=cls; return e;}
+
+  // ---- build quiz cards ----
+  var grid=document.getElementById('placeGrid');
+  PLACES.forEach(function(p){
+    var c=el('button','card');
+    c.type='button'; c.setAttribute('aria-pressed','false'); c.dataset.id=p.id;
+    c.innerHTML='<span class="pick">✓</span><span class="emo">'+p.emo+'</span>'+
+      '<span class="nm">'+p.nm+'</span><span class="ar">'+p.ar+'</span>'+
+      '<span class="tag '+(p.free?'free':'paid')+'">'+(p.free?'Free 💚':'Small entry')+'</span>'+
+      '<span class="ds">'+p.ds+'</span>';
+    c.addEventListener('click',function(){
+      var on=c.getAttribute('aria-pressed')==='true';
+      if(on){ c.setAttribute('aria-pressed','false'); selected=selected.filter(function(x){return x!==p.id;}); }
+      else{ c.setAttribute('aria-pressed','true'); selected.push(p.id); }
+      updateCount();
+    });
+    grid.appendChild(c);
+  });
+
+  function updateCount(){
+    var n=selected.length, msg=document.getElementById('countMsg'), btn=document.getElementById('makeBtn');
+    btn.disabled=n===0;
+    msg.textContent = n===0 ? 'pick at least one 💗' : (n===1 ? '1 pick 💗' : n+' picks 💗');
+  }
+
+  // ---- mode toggle ----
+  document.getElementById('modeSeg').addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b)return;
+    mode=b.dataset.mode;
+    this.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', String(x===b)); });
+  });
+
+  // ---- build plan ----
+  function buildPlan(){
+    // return journey: visit stops from Gachibowli side back toward home (descending order)
+    var chosen=PLACES.filter(function(p){return selected.indexOf(p.id)>-1;})
+                     .sort(function(a,b){return b.order-a.order || selected.indexOf(a.id)-selected.indexOf(b.id);});
+
+    var items=[], saved=[], fitted=[];
+    var travelCost=0, entryCost=0, clock=START;
+
+    items.push({type:'start', t:fmt(START), ttl:'Pick-up at GRIET 💑', sub:'Bachupally main gate — our day begins.'});
+
+    // GRIET -> Antera (lunch first, reach by 12:30)
+    var f0=fare(GRIET_TO_ANTERA,mode); travelCost+=f0;
+    items.push({type:'travel', t:'', ttl:(mode==='auto'?'🛺 Auto':'🚗 Cab')+' · ~'+GRIET_TO_ANTERA.min+' min to Gachibowli', fare:'≈ ₹'+f0});
+    var lunchEnd=ANTERA_ARRIVE+LUNCH_MIN;
+    items.push({type:'lunch', t:fmt(ANTERA_ARRIVE)+' – '+fmt(lunchEnd), ttl:'🍽️ Lunch at Antera, Gachibowli',
+                sub:'We reach by '+fmt(ANTERA_ARRIVE)+', comfortably before 12:30. Order the works, bangaram — this one’s my treat. 😌❤️'});
+    clock=lunchEnd;
+
+    // return stops
+    var firstReturn=true, last=null;
+    chosen.forEach(function(p){
+      var leg = firstReturn ? p.a : MID;
+      var afterTravel=clock+leg.min;
+      var afterStop=afterTravel+p.dur;
+      // keep room to still get home before 5 using this stop's home leg
+      if(afterStop + p.g.min > END){ saved.push(p); return; }
+      var fv=fare(leg,mode); travelCost+=fv; entryCost+=p.entry;
+      items.push({type:'travel', t:'', ttl:(mode==='auto'?'🛺 Auto':'🚗 Cab')+' · ~'+leg.min+' min', fare:'≈ ₹'+fv});
+      items.push({type:'stop', t:fmt(afterTravel)+' – '+fmt(afterStop), ttl:p.emo+' '+p.nm,
+                  sub:p.ds + (p.entry? '' : '  ·  free 💗')});
+      clock=afterStop; last=p; firstReturn=false; fitted.push(p);
+    });
+
+    // final leg home
+    var homeLeg = last ? last.g : {min:40,auto:220};
+    var fh=fare(homeLeg,mode); travelCost+=fh;
+    items.push({type:'travel', t:'', ttl:(mode==='auto'?'🛺 Auto':'🚗 Cab')+' · ~'+homeLeg.min+' min home', fare:'≈ ₹'+fh});
+    var homeTime=clock+homeLeg.min;
+    items.push({type:'end', t:'by '+fmt(homeTime), ttl:'🏡 Home, happy & tired',
+                sub:'Dropped safe, sun going down, already planning the next one with you. 💞'});
+
+    var grand=travelCost+entryCost;
+    shareText=buildShareText(items, grand);
+    setupSend();
+    render(items, fitted.length, saved, travelCost, entryCost, grand);
+    show('plan');
+  }
+
+  function buildShareText(items, grand){
+    var L=['💞 Our Day Together 💞',
+           (mode==='auto'?'🛺 Auto':'🚗 Cab')+' · 11:30 – ~5:00 pm',''];
+    items.forEach(function(it){
+      if(it.type==='start')       L.push('📍 '+it.t+'  '+it.ttl);
+      else if(it.type==='travel') L.push('   ↳ '+it.ttl+'  ('+it.fare+')');
+      else if(it.type==='lunch')  L.push('🍽️ '+it.t+'  '+it.ttl);
+      else if(it.type==='stop')   L.push('💗 '+it.t+'  '+it.ttl);
+      else if(it.type==='end')    L.push('🏡 '+it.t+'  '+it.ttl);
+    });
+    L.push('', '💰 Approx ₹'+grand+' for us (Antera lunch extra — my treat 😌)');
+    L.push('', 'Made with love, just for us. 💌');
+    return L.join('\n');
+  }
+
+  function setupSend(){
+    document.getElementById('waBtn').href='https://wa.me/?text='+encodeURIComponent(shareText);
+    var ta=document.getElementById('fallback'); ta.value=shareText; ta.hidden=true;
+    toast('');
+  }
+
+  var toastTimer=null;
+  function toast(msg){
+    var t=document.getElementById('toast'); t.textContent=msg; t.style.opacity='1';
+    if(toastTimer) clearTimeout(toastTimer);
+    if(msg){ toastTimer=setTimeout(function(){ t.style.opacity='0'; }, 4000); }
+  }
+
+  function copyPlan(){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(shareText).then(function(){
+        toast('Copied 💞 now paste it to Bangaram!');
+      }).catch(function(){ showFallback(); });
+    } else { showFallback(); }
+  }
+  function showFallback(){
+    var ta=document.getElementById('fallback');
+    ta.hidden=false; ta.focus(); ta.select();
+    try{ document.execCommand('copy'); toast('Copied 💞 paste it to Bangaram!'); }
+    catch(e){ toast('Select the text above & copy 💗'); }
+  }
+
+  function render(items, stopN, saved, travelCost, entryCost, grand){
+    var tl=document.getElementById('timeline'); tl.innerHTML='';
+    items.forEach(function(it,idx){
+      var row=el('div','tl '+it.type);
+      row.style.animationDelay=(idx*0.05)+'s';
+      if(it.type==='travel'){
+        row.innerHTML='<div class="ttl">'+it.ttl+' <span class="fare">'+it.fare+'</span></div>';
+      }else if(it.type==='lunch' || it.type==='end'){
+        row.innerHTML='<div class="box"><div class="t">'+it.t+'</div><div class="ttl">'+it.ttl+'</div><div class="sub">'+it.sub+'</div></div>';
+      }else{
+        row.innerHTML=(it.t?'<div class="t">'+it.t+'</div>':'')+'<div class="ttl">'+it.ttl+'</div>'+(it.sub?'<div class="sub">'+it.sub+'</div>':'');
+      }
+      tl.appendChild(row);
+    });
+
+    document.getElementById('stopCount').textContent = stopN+(stopN===1?' stop':' stops');
+
+    var sv=document.getElementById('savedMsg');
+    if(saved.length){
+      sv.hidden=false;
+      sv.textContent='saved for our next date 💞 '+saved.map(function(p){return p.nm;}).join(', ');
+    } else { sv.hidden=true; }
+
+    document.getElementById('summary').innerHTML=
+      '<div class="row">🛺 Getting around (both ways) <b>≈ ₹'+travelCost+'</b></div>'+
+      '<div class="row">🎟️ Little stops & entries <b>≈ ₹'+entryCost+'</b></div>'+
+      '<div class="row total">Our whole day out <b>≈ ₹'+grand+'</b></div>'+
+      '<div class="tiny">Approx for two, not counting lunch at Antera. Share one auto and it’s even lighter — share the back seat, obviously. 😉</div>';
+  }
+
+  // ---- nav ----
+  document.getElementById('startBtn').addEventListener('click',function(){ show('quiz'); });
+  document.getElementById('backWelcome').addEventListener('click',function(){ show('welcome'); });
+  document.getElementById('makeBtn').addEventListener('click',buildPlan);
+  document.getElementById('copyBtn').addEventListener('click',copyPlan);
+  document.getElementById('editBtn').addEventListener('click',function(){ show('quiz'); });
+  document.getElementById('restartBtn').addEventListener('click',function(){
+    selected=[]; mode='auto';
+    grid.querySelectorAll('.card').forEach(function(c){c.setAttribute('aria-pressed','false');});
+    document.querySelectorAll('#modeSeg button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.mode==='auto'));});
+    updateCount(); show('welcome');
+  });
+
+  updateCount();
+})();
+</script>
